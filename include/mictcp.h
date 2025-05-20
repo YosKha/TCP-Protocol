@@ -54,7 +54,7 @@ typedef struct mic_tcp_sock_addr
 typedef struct mic_tcp_sock
 {
   int fd;  /* descripteur du socket */
-  protocol_state state; /* état du protocole */
+  protocol_state state; /* état du p  rotocole */
   mic_tcp_sock_addr local_addr; /* adresse locale du socket */
   mic_tcp_sock_addr remote_addr; /* adresse distante du socket */
 } mic_tcp_sock;
