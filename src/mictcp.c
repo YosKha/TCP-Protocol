@@ -68,7 +68,7 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
     pdu.payload.data = mesg;
     pdu.payload.size = mesg_size;
 
-    int lg_envoyee = IP_send(pdu, mic_sock.remote_addr);
+    int lg_envoyee = IP_send(pdu, mainSocket.remote_addr.ip_addr);
     return lg_envoyee;
 }
 
@@ -82,7 +82,7 @@ int mic_tcp_recv (int socket, char* mesg, int max_mesg_size)
 {
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
     
-    mic_tcp_payload = payload;
+    mic_tcp_payload payload;
     
     payload.data = mesg;
     payload.size = max_mesg_size;
@@ -99,7 +99,7 @@ int mic_tcp_recv (int socket, char* mesg, int max_mesg_size)
 int mic_tcp_close (int socket)
 {
     printf("[MIC-TCP] Appel de la fonction :  "); printf(__FUNCTION__); printf("\n");
-    mainSocket.state = IDLE
+    mainSocket.state = IDLE;
     return 0;
 }
 
