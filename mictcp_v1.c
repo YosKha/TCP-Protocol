@@ -1,9 +1,9 @@
 #include <mictcp.h>
 #include <api/mictcp_core.h>
 #define MAX_NB_SOCKET 100
-#define MAX_ATTEMPT 10
+
 mic_tcp_sock mainSocket;
-int num_seq =0;
+
 /*
  * Permet de créer un socket entre l’application et MIC-TCP
  * Retourne le descripteur du socket ou bien -1 en cas d'erreur
@@ -50,7 +50,6 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
     mainSocket.remote_addr = addr;
 
-
     return 0;
 }
 
@@ -65,31 +64,9 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
     mic_tcp_pdu pdu;
     pdu.header.source_port = 9000;
     pdu.header.dest_port = mainSocket.remote_addr.port;
-    pdu.header.seq_num = num_seq;
-    pdu.header.ack = 0;
-    pdu.header.ack_num = 0;
 
     pdu.payload.data = mesg;
     pdu.payload.size = mesg_size;
-
-    ack_received = 0;
-
-    while(!ack_received){
-        int sent = IP_send(pdu, mainSocket.remote_addr.ip_addr);
-        if(sent < 0) return 0;
-
-
-        mic_tcp_pdu ack_pdu;
-        int received = IP_recv(&ack_pdu, NULL);
-
-        if(received > 0 && ack_pdu.header.ack ==1 && ack_pdu_header.ack_num == num_seq){
-            ack_received = 1;
-        }
-
-        num_seq = (num_seq + 1)%2;
-
-        return mesg_size;
-    }
 
     int lg_envoyee = IP_send(pdu, mainSocket.remote_addr.ip_addr);
     return lg_envoyee;
@@ -135,33 +112,6 @@ int mic_tcp_close (int socket)
 void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_ip_addr remote_addr)
 {
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
-    if(pdu.header.ack == 0){
-        static int expected_seq_num = 0;
-        
-        if(pdu.header.seq_num == expected_seq_num){
-            app_buffer_put(pdu.payload);
-            expected_seq_num = (expected_seq_num+1)%2;
-
-            mic_tcp_pdu ack;
-            ack.header.source_port = mainSocket.local_addr.port;
-            ack.header.dest_port = mainSocket.remote_addr.port;
-            ack.header.seq_num = 0;
-            ack.header.ack = 1;
-            ack.header.ack_num = pdu.header.seq_num;
-            ack.payload.data = NULL;
-            ack.payload.size = 0;
-
-            IP_send(ack, remote_addr);
-
-        }
-        else if(pdu.header.ack == 1){
-            if(pdu.header.ack_num == 1){
-                if(pdu.header.ack_num == num_seq){
-                    ack_received = 1;
-                }
-            }
-        }
-    }
 
     app_buffer_put(pdu.payload);
 }
