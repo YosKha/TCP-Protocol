@@ -3,9 +3,20 @@
 #define MAX_NB_SOCKET 100
 #define MAX_ATTEMPT 10
 #define TIMEOUT 100
+#define NB_WATCHED_LOSSES 10
+#define ACCEPTABLE_LOSSRATE 0.2
 
 mic_tcp_sock mainSocket;
 int num_seq =0;
+
+int* loss_table = malloc(NB_WATCHED_LOSSES*sizeof(int));
+int loss_tab_index = 0;
+int nb_losses = 0;
+for(int i=0; i<NB_WATCHED_LOSSES; i++){
+    loss_table[i] = 0;
+}
+
+
 /*
  * Permet de créer un socket entre l’application et MIC-TCP
  * Retourne le descripteur du socket ou bien -1 en cas d'erreur
@@ -78,10 +89,9 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
     int lg_envoyee = IP_send(pdu, mainSocket.remote_addr.ip_addr);
 
     // Attente du PDU ACK en retour
-    int ack_received = 0;
-
     int counter = 0;
-    while(!ack_received && counter < MAX_ATTEMPT){
+    int isRepeated = 0;
+    do{
         int sent = IP_send(pdu, mainSocket.remote_addr.ip_addr);
         if(sent < 0) return 0;
 
@@ -94,14 +104,37 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
         remote.addr = malloc(INET_ADDRSTRLEN);
         int received = IP_recv(&ack_pdu, &local, &remote, TIMEOUT);
 
+        """if(isRepeated){
+            loss_tab_index --;
+        }"""
 
+        // It has received the good ack
         if(received >= 0 && ack_pdu.header.ack ==1 && ack_pdu.header.ack_num == num_seq){
-            ack_received = 1;
             num_seq = (num_seq + 1)%2;
+            
+            if(loss_table[loss_tab_index] == 1){
+                nb_losses --;
+            }
+            loss_table[loss_tab_index] = 0;
+            loss_tab_index ++;
+            if(loss_tab_index == NB_WATCHED_LOSSES){
+                loss_tab_index = 0;
+            }
+        // It has had a loss
+        }else if(!isRepeated){
+            if(loss_table[loss_tab_index] != 1){
+                loss_table[loss_tab_index] = 1;
+                nb_losses ++;
+            }
+            loss_tab_index ++;
+            if(loss_tab_index == NB_WATCHED_LOSSES){
+                loss_tab_index = 0;
+            }
         }
         
+        isRepeated = 1;
         counter ++;
-    }
+    }while((nb_losses/NB_WATCHED_LOSSES) > ACCEPTABLE_LOSSRATE)
 
     if(counter == MAX_ATTEMPT){
         return -1;
