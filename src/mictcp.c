@@ -1,19 +1,34 @@
 #include <mictcp.h>
 #include <api/mictcp_core.h>
+#include <stdlib.h>
 #define MAX_NB_SOCKET 100
 #define MAX_ATTEMPT 10
 #define TIMEOUT 100
 #define NB_WATCHED_LOSSES 10
-#define ACCEPTABLE_LOSSRATE 0.2
+#define ACCEPTABLE_LOSSRATE 0.8
+
+#define KNRM  "\x1B[0m"
+#define KRED  "\x1B[31m"
+#define KGRN  "\x1B[32m"
+#define KYEL  "\x1B[33m"
+#define KBLU  "\x1B[34m"
+#define KMAG  "\x1B[35m"
+#define KCYN  "\x1B[36m"
+#define KWHT  "\x1B[37m"
 
 mic_tcp_sock mainSocket;
 int num_seq =0;
 
-int* loss_table = malloc(NB_WATCHED_LOSSES*sizeof(int));
+int loss_table[NB_WATCHED_LOSSES] = {0};
 int loss_tab_index = 0;
 int nb_losses = 0;
-for(int i=0; i<NB_WATCHED_LOSSES; i++){
-    loss_table[i] = 0;
+
+void printLosses(){
+    printf("%s{", KYEL);
+    for(int i=0; i<NB_WATCHED_LOSSES; i++){
+        printf("%d, ", loss_table[i]);
+    }
+    printf("}\n%s", KWHT);
 }
 
 
@@ -74,6 +89,7 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
 {
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
+;
 
     // PDU message à envoyé
     mic_tcp_pdu pdu;
@@ -86,64 +102,53 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
     pdu.payload.data = mesg;
     pdu.payload.size = mesg_size;
 
-    int lg_envoyee = IP_send(pdu, mainSocket.remote_addr.ip_addr);
+    // Info pour le ACK
+    mic_tcp_pdu ack_pdu;
+    ack_pdu.payload.size = 0;
+    mic_tcp_ip_addr local;
+    mic_tcp_ip_addr remote;
+    remote.addr_size = INET_ADDRSTRLEN;
+    remote.addr = malloc(INET_ADDRSTRLEN);
 
-    // Attente du PDU ACK en retour
-    int counter = 0;
-    int isRepeated = 0;
+    int lg_envoyee;
+    float loss_ratio;
+    int cond = 0;
+    // Envoie du PDU et en attente du PDU ACK en retour
     do{
-        int sent = IP_send(pdu, mainSocket.remote_addr.ip_addr);
-        if(sent < 0) return 0;
-
-
-        mic_tcp_pdu ack_pdu;
-        ack_pdu.payload.size = 0;
-        mic_tcp_ip_addr local;
-        mic_tcp_ip_addr remote;
-        remote.addr_size = INET_ADDRSTRLEN;
-        remote.addr = malloc(INET_ADDRSTRLEN);
+        lg_envoyee  = IP_send(pdu, mainSocket.remote_addr.ip_addr);
+        if(lg_envoyee < 0) return -1;
         int received = IP_recv(&ack_pdu, &local, &remote, TIMEOUT);
 
-        """if(isRepeated){
-            loss_tab_index --;
-        }"""
-
-        // It has received the good ack
+        // Le ack a bien été reçu
         if(received >= 0 && ack_pdu.header.ack ==1 && ack_pdu.header.ack_num == num_seq){
             num_seq = (num_seq + 1)%2;
-            
+            printf("%sACK has been received\n", KGRN);
             if(loss_table[loss_tab_index] == 1){
                 nb_losses --;
+                loss_table[loss_tab_index] = 0;
             }
-            loss_table[loss_tab_index] = 0;
-            loss_tab_index ++;
-            if(loss_tab_index == NB_WATCHED_LOSSES){
-                loss_tab_index = 0;
-            }
-        // It has had a loss
-        }else if(!isRepeated){
-            if(loss_table[loss_tab_index] != 1){
-                loss_table[loss_tab_index] = 1;
+
+        // on a pas reçu de ack attendu
+        }else {
+            printf("%sACK has not been received\n", KRED);
+            if(loss_table[loss_tab_index] == 0 && ! cond){
                 nb_losses ++;
-            }
-            loss_tab_index ++;
-            if(loss_tab_index == NB_WATCHED_LOSSES){
-                loss_tab_index = 0;
+                loss_table[loss_tab_index] = 1;
             }
         }
-        
-        isRepeated = 1;
-        counter ++;
-    }while((nb_losses/NB_WATCHED_LOSSES) > ACCEPTABLE_LOSSRATE)
 
-    if(counter == MAX_ATTEMPT){
-        return -1;
-    }else{
-        return lg_envoyee;
+        loss_ratio = (nb_losses / (float)NB_WATCHED_LOSSES);
+        cond = (loss_ratio > (float) ACCEPTABLE_LOSSRATE);
+        printf("%sInfo :\nnb_losses = %d\nratio = %f\ncond=%d\n", KBLU, nb_losses, loss_ratio, cond);
+        printLosses();
+    }while(cond);
+    printf("%s\n", KWHT);
+    loss_tab_index++;
+    if(loss_tab_index == NB_WATCHED_LOSSES){
+        loss_tab_index = 0;
     }
 
-    
-    
+    return lg_envoyee;
 }
 
 /*
@@ -166,7 +171,8 @@ int mic_tcp_recv (int socket, char* mesg, int max_mesg_size)
 }
 
 /*
- * Permet de réclamer la destruction d’un socket.
+ * Permet de récl
+ * amer la destruction d’un socket.
  * Engendre la fermeture de la connexion suivant le modèle de TCP.
  * Retourne 0 si tout se passe bien et -1 en cas d'erreur
  */
