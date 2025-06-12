@@ -44,7 +44,7 @@ int mic_tcp_socket(start_mode sm)
    int result = -1;
    printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
    result = initialize_components(sm); /* Appel obligatoire */
-   set_loss_rate(20);
+   set_loss_rate(0);
 
    mainSocket.fd = 1;
    mainSocket.state = IDLE;
@@ -78,32 +78,33 @@ int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr)
     syn_ack_pdu.header.syn = 1;
     syn_ack_pdu.header.ack = 1;
     syn_ack_pdu.payload.size = 0;
+    syn_ack_pdu.payload.data = NULL;
 
     int sent_size;
 
     // Pending SYN
-    printf("%s WAITING SYN\n", KYEL);
+    printf("%s WAITING SYN\n%s", KYEL, KWHT);
     pthread_mutex_lock(&mutex);
     while(mainSocket.state != SYN_RECEIVED){
         pthread_cond_wait(&flag, &mutex);
     }
     pthread_mutex_unlock(&mutex);
-    printf("%s SYN RECEIVED\n", KGRN);
+    printf("%s SYN RECEIVED\n %s", KGRN, KWHT);
 
     // Sending SYN-ACK
     if((sent_size = IP_send(syn_ack_pdu, mainSocket.remote_addr.ip_addr))<0){
         return -1;
     }
-    printf("%s SYN-ACK SENT\n", KGRN);
+    printf("%s SYN-ACK SENT\n%s", KGRN, KWHT);
 
     // Pending ACK
-    printf("%s WAITING ACK\n", KYEL);
+    printf("%s WAITING ACK\n%s", KYEL, KWHT);
     pthread_mutex_lock(&mutex);
     while(mainSocket.state != ESTABLISHED){
         pthread_cond_wait(&flag, &mutex);
     }
     pthread_mutex_unlock(&mutex);
-    printf("%s ACK RECEIVED/n", KGRN);
+    printf("%s ACK RECEIVED\n%s", KGRN, KWHT);
 
     return 0;
 }
@@ -124,6 +125,11 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
     syn_pdu.header.dest_port = mainSocket.remote_addr.port;
     syn_pdu.header.syn = 1;
     syn_pdu.payload.size = 0;
+    syn_pdu.payload.data = NULL;
+
+    // SYN-ACK PDU
+    mic_tcp_pdu syn_ack_pdu;
+    syn_ack_pdu.payload.size = 0;
 
     // ACK pdu
     mic_tcp_pdu ack_pdu;
@@ -133,31 +139,37 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
     ack_pdu.header.ack = 1;
     ack_pdu.header.ack_num = num_seq;
     ack_pdu.payload.size = 0;
+    ack_pdu.payload.data = NULL;
 
 
     int sent_size;
+    int received_size;
 
     // Sending SYN
     if((sent_size = IP_send(syn_pdu, addr.ip_addr)) < 0){
         return -1;
     }
     mainSocket.state = SYN_SENT;
-    printf("%s SYN SENT\n", KGRN);
+    printf("%s SYN SENT\n%s", KGRN, KWHT);
 
     // Receiving SYN-ACK
-    printf("%s WAITING SYN-ACK\n", KYEL);
-    pthread_mutex_lock(&mutex);
-    while(mainSocket.state != SYN_RECEIVED){
-        pthread_cond_wait(&flag, &mutex);
+    printf("%s WAITING SYN-ACK\n%s", KYEL, KWHT);
+    int syn_ack_flag = 0;
+    while(!syn_ack_flag){
+        if((received_size = IP_recv(&syn_ack_pdu, &mainSocket.local_addr.ip_addr, &mainSocket.remote_addr.ip_addr, TIMEOUT)) < 0){
+            continue;
+        }
+        if(syn_ack_pdu.header.syn == 1 && syn_ack_pdu.header.ack == 1){
+            syn_ack_flag = 1;
+        }
     }
-    pthread_mutex_unlock(&mutex);
-    printf("%s SYN-ACK RECEIVED\n", KGRN);
+    printf("%s SYN-ACK RECEIVED\n%s", KGRN, KWHT);
 
     // Sending ACK
     if((sent_size  = IP_send(ack_pdu, addr.ip_addr)) < 0){
         return -1;
     }
-    printf("%s ACK SENT\n", KGRN);
+    printf("%s ACK SENT\n%s", KGRN, KWHT);
 
     return 0;
 }
@@ -273,7 +285,9 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_i
 {
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
     if(pdu.header.syn == 1){
-        printf("sdfsdfqs\n");
+
+        mainSocket.remote_addr.ip_addr = remote_addr;
+        mainSocket.remote_addr.port = pdu.header.source_port;
         pthread_cond_broadcast(&flag);
         mainSocket.state = SYN_RECEIVED;
     }
