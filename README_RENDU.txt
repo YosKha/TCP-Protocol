@@ -12,9 +12,9 @@ Ce qui marche :
 
 Ce qui ne marque pas :
 - phase établissement de connexion TCP (Pour un pourcentage de pertes élevé)
--> Par conséquent pour imposer un connexion réussi et pouvoir tester la fiabilité partielle.
-Nous avons défini le LOSSRATE=0 avant la connexion et LOSSRATE=20 une fois connecté.
-Pour changer la valeur "20", il faut modifier #define LOSSRATE 20
+-> Par conséquent pour imposer la réussite de la connexion et pouvoir tester la fiabilité partielle,
+nous avons défini le LOSSRATE=0 avant la connexion et LOSSRATE=20 une fois connecté.
+Pour changer la valeur "20", il faut modifier #define LOSSRATE 20 (en pourcentage)
 
 Choix d'implémentation :
 -> Stop and Wait :
@@ -22,6 +22,7 @@ Utilisation d'une "do-while" pour imposer un premier envoie du pdu
 
 -> Négociation pertes :
 C'est le client qui impose/fixe le taux de pertes accepté.
+ON peut le modifier via #define ACCEPTABLE_LOSSRATE 20 (en pourcentage)
 On a rajouté un attribut "acceptable_lossrate" mic_tcp_header pour partager le taux de pertes
 accepté avec le serveur. Cette valeur est donnée dans le SYN de connexion client/serveur.
 Par ailleurs, on a ajouté le même attribut à mic_tcp_socket pour y avoir accès à tout instant.
