@@ -5,7 +5,7 @@
 #define MAX_ATTEMPT 10
 #define TIMEOUT 100
 #define NB_WATCHED_LOSSES 10
-#define ACCEPTABLE_LOSSRATE 0.8
+#define ACCEPTABLE_LOSSRATE 80
 
 #define KNRM  "\x1B[0m"
 #define KRED  "\x1B[31m"
@@ -44,7 +44,7 @@ int mic_tcp_socket(start_mode sm)
    int result = -1;
    printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
    result = initialize_components(sm); /* Appel obligatoire */
-   set_loss_rate(0);
+   set_loss_rate(20);
 
    mainSocket.fd = 1;
    mainSocket.state = IDLE;
@@ -80,7 +80,7 @@ int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr)
     syn_ack_pdu.payload.size = 0;
     syn_ack_pdu.payload.data = NULL;
 
-    int sent_size;
+    int sent_size = -1;
 
     // Pending SYN
     printf("%s WAITING SYN\n%s", KYEL, KWHT);
@@ -120,7 +120,7 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 
     // SYN pdu
     mic_tcp_pdu syn_pdu;
-    syn_pdu.header.seq_num = num_seq;
+    syn_pdu.header.seq_num = 20;
     syn_pdu.header.source_port = mainSocket.local_addr.port;
     syn_pdu.header.dest_port = mainSocket.remote_addr.port;
     syn_pdu.header.syn = 1;
@@ -218,7 +218,7 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
             if(loss_table[loss_tab_index] == 1){
                 nb_losses --;
                 loss_table[loss_tab_index] = 0;
-            }
+        }
 
         // on a pas reçu de ack attendu
         }else {
