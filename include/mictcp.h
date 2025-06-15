@@ -57,6 +57,7 @@ typedef struct mic_tcp_sock
   protocol_state state; /* état du p  rotocole */
   mic_tcp_sock_addr local_addr; /* adresse locale du socket */
   mic_tcp_sock_addr remote_addr; /* adresse distante du socket */
+  float acceptable_lossrate /* entre 0 (0%) et 1 (100%)*/;
 } mic_tcp_sock;
 
 /*
@@ -80,6 +81,7 @@ typedef struct mic_tcp_header
   unsigned char syn; /* flag SYN (valeur 1 si activé et 0 si non) */
   unsigned char ack; /* flag ACK (valeur 1 si activé et 0 si non) */
   unsigned char fin; /* flag FIN (valeur 1 si activé et 0 si non) */
+  float acceptable_lossrate; /* entre 0 (0%) et 1 (100%)*/
 } mic_tcp_header;
 
 /*
