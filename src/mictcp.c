@@ -36,7 +36,6 @@ void printLosses(){
 
 // connection
 pthread_cond_t syn_cond = PTHREAD_COND_INITIALIZER;
-pthread_cond_t syn_ack_cond = PTHREAD_COND_INITIALIZER;
 pthread_cond_t ack_cond = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -149,9 +148,7 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
     syn_pdu.header.ack = 0;
     syn_pdu.payload.size = 0;
     syn_pdu.payload.data = NULL;
-    syn_pdu.header.acceptable_lossrate = (float) ACCEPTABLE_LOSSRATE;// Le client défini le taux de perte dès la demande de connexion
-
-    printf("%sdefine : %f | var : %f\n%s",KMAG, (float) ACCEPTABLE_LOSSRATE, syn_pdu.header.acceptable_lossrate, KWHT);
+    syn_pdu.header.acceptable_lossrate = ACCEPTABLE_LOSSRATE;
 
     // SYN-ACK PDU
     mic_tcp_pdu syn_ack_pdu;
@@ -199,6 +196,7 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
     }
     printf("%s ACK SENT\n%s", KGRN, KWHT);
     mainSocket.state = ESTABLISHED;
+    mainSocket.acceptable_lossrate = ACCEPTABLE_LOSSRATE;
     printf("%sCONNEXION ETABLIE\n%s", KBLU, KWHT);
     set_loss_rate(LOSSRATE);
     return 0;
@@ -261,7 +259,8 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
         }
 
         loss_ratio = (nb_losses / (float)NB_WATCHED_LOSSES);
-        cond = (loss_ratio > mainSocket.acceptable_lossrate);
+        cond = (loss_ratio*100 > mainSocket.acceptable_lossrate);
+        printf("%sdefine : %d | var : %d\n%s",KMAG, ACCEPTABLE_LOSSRATE, mainSocket.acceptable_lossrate, KWHT);
         printf("%sInfo :\nnb_losses = %d\nratio = %f\ncond=%d\n", KBLU, nb_losses, loss_ratio, cond);
         printLosses();
     }while(cond);
@@ -321,7 +320,6 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_i
         mainSocket.remote_addr.ip_addr = remote_addr;
         mainSocket.remote_addr.port = pdu.header.source_port;
 
-        printf("%sdefine : %f | var : %f\n%s",KMAG, (float) ACCEPTABLE_LOSSRATE, pdu.header.acceptable_lossrate, KWHT);
         mainSocket.acceptable_lossrate = pdu.header.acceptable_lossrate;
         pthread_cond_broadcast(&syn_cond);
         mainSocket.state = SYN_RECEIVED;
